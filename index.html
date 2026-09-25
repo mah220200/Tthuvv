@@ -1,1 +1,283 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gửi Em - Ánh Trăng Đêm Thu</title>
+    <style>
+        /* CSS Reset & Cơ sở */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(to bottom, #020111 0%, #170936 100%);
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden; /* Chặn thanh cuộn */
+            height: 100vh;
+            position: relative;
+        }
 
+        /* -------------------------------------
+           MÔ HÌNH GATEWAY (XỬ LÝ AUTOPLAY AUDIO)
+           ------------------------------------- */
+        #gateway-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 2, 15, 0.98);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 1.5s ease-in-out, visibility 1.5s;
+        }
+        #gateway-overlay h1 {
+            color: #ffb703;
+            text-shadow: 0 0 15px #fb8500;
+            margin-bottom: 30px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            text-align: center;
+            padding: 0 20px;
+        }
+        .open-btn {
+            padding: 15px 50px;
+            font-size: 1.2rem;
+            background: linear-gradient(45deg, #fb8500, #ffb703);
+            border: none;
+            border-radius: 50px;
+            color: #1a0b2e;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 183, 3, 0.4);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            outline: none;
+        }
+        .open-btn:hover { transform: scale(1.1); box-shadow: 0 0 30px rgba(255, 183, 3, 0.8); }
+
+        /* -------------------------------------
+           HIỆU ỨNG THỊ GIÁC (CSS ANIMATIONS)
+           ------------------------------------- */
+        /* Canvas Bầu Trời Sao (Tầng đáy) */
+        #starfield { position: absolute; top: 0; left: 0; z-index: 1; }
+
+        /* Vầng Trăng (Tầng giữa) */
+        .moon {
+            position: absolute;
+            top: 15%; left: 50%;
+            transform: translateX(-50%);
+            width: 250px; height: 250px;
+            background: #fff;
+            border-radius: 50%;
+            /* 3D Bóng đổ vầng trăng */
+            box-shadow: 0 0 80px #ffb703, inset -20px -20px 40px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        /* Container chứa lời chúc (Tầng trên cùng) */
+        .wish-container {
+            position: absolute;
+            top: 60%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 85%; max-width: 650px;
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 183, 3, 0.2);
+            opacity: 0; /* Ẩn ban đầu, sẽ fade-in qua JS */
+            transition: opacity 2.5s ease-in-out;
+            text-align: center;
+        }
+        .wish-text {
+            font-size: 1.6rem;
+            line-height: 1.8;
+            color: #ffeaa7;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+            font-style: italic;
+            font-weight: 300;
+        }
+        .loader {
+            color: #ffb703;
+            font-size: 1.2rem;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+        /* Đèn lồng bay (Tối ưu hóa GPU qua Transform) */
+        .lantern {
+            position: absolute;
+            bottom: -150px;
+            width: 30px; height: 45px;
+            background: radial-gradient(circle at 30% 30%, #ff6b6b, #c0392b);
+            border-radius: 10px 10px 8px 8px;
+            box-shadow: 0 0 20px #e74c3c;
+            animation: float-up infinite linear;
+            z-index: 15;
+            opacity: 0.8;
+            will-change: transform; /* Báo trình duyệt chuẩn bị tính toán GPU */
+        }
+        /* Ánh lửa dưới đáy đèn */
+        .lantern::after {
+            content: '';
+            position: absolute;
+            bottom: -6px; left: 50%;
+            transform: translateX(-50%);
+            width: 12px; height: 12px;
+            background: #f1c40f;
+            border-radius: 50%;
+            filter: blur(2px);
+        }
+        
+        /* Hiệu ứng bay lên, không dùng thuộc tính Top để tránh Reflow */
+        @keyframes float-up {
+            0% { transform: translateY(0) scale(1) rotate(-5deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 0.8; }
+            100% { transform: translateY(-110vh) scale(0.7) rotate(5deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- GIAO DIỆN CHỜ (Yêu cầu tương tác vật lý) -->
+    <div id="gateway-overlay">
+        <h1>Một Mùa Trăng Nữa Lại Về...</h1>
+        <button class="open-btn" id="open-btn">Mở Thông Điệp</button>
+    </div>
+
+    <!-- CANVAS BẦU TRỜI SAO -->
+    <canvas id="starfield"></canvas>
+
+    <!-- THÀNH PHẦN NGHỆ THUẬT -->
+    <div class="moon"></div>
+    <div class="wish-container" id="wish-container">
+        <p class="wish-text" id="wish-text">
+            <span class="loader">Đang nhận tín hiệu từ các vì sao...</span>
+        </p>
+    </div>
+    
+    <!-- AUDIO PLAYER: KHÔNG dùng thuộc tính autoplay -->
+    <audio id="bg-music" loop preload="auto">
+        <!-- Đặt URL nhạc hòa tấu không bản quyền (Piano/Sáo trúc) -->
+        <source src="https://cdn.pixabay.com/download/audio/2023/10/24/audio_34b563dc6b.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // ==========================================
+        // MODULE 1: HỆ THỐNG CANVAS STARFIELD TỐI ƯU
+        // ==========================================
+        const canvas = document.getElementById('starfield');
+        const ctx = canvas.getContext('2d');
+        let stars = [];
+        const numStars = window.innerWidth < 768 ? 100 : 250; // Tối ưu mobile
+
+        function initCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            stars = [];
+            for(let i = 0; i < numStars; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 1.5 + 0.5,
+                    alpha: Math.random(),
+                    change: (Math.random() * 0.015) + 0.005
+                });
+            }
+        }
+
+        function animateStars() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            stars.forEach(star => {
+                star.alpha += star.change;
+                if(star.alpha > 1 || star.alpha < 0.1) star.change = -star.change; // Tạo hiệu ứng nhấp nháy
+                
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
+                ctx.fill();
+            });
+            // Sử dụng rAF để đồng bộ hóa 60FPS với GPU
+            requestAnimationFrame(animateStars); 
+        }
+
+        window.addEventListener('resize', initCanvas);
+        initCanvas();
+        animateStars();
+
+        // ==========================================
+        // MODULE 2: SINH ĐÈN LỒNG BAY (DOM MANIPULATION)
+        // ==========================================
+        function spawnLanterns() {
+            const lanternCount = window.innerWidth < 768 ? 10 : 20;
+            for(let i = 0; i < lanternCount; i++) {
+                let lantern = document.createElement('div');
+                lantern.className = 'lantern';
+                // Khởi tạo các giá trị ngẫu nhiên
+                lantern.style.left = `${Math.random() * 95}vw`;
+                lantern.style.animationDuration = `${12 + Math.random() * 20}s`;
+                lantern.style.animationDelay = `${Math.random() * 10}s`;
+                
+                // Quy mô từ 0.4 đến 1 để tạo cảm giác chiều sâu (gần/xa)
+                lantern.style.transform = `scale(${0.4 + Math.random() * 0.6})`;
+                document.body.appendChild(lantern);
+            }
+        }
+        spawnLanterns();
+
+        // ==========================================
+        // MODULE 3: XỬ LÝ SỰ KIỆN GIAO DIỆN VÀ GỌI API
+        // ==========================================
+        const openBtn = document.getElementById('open-btn');
+        const overlay = document.getElementById('gateway-overlay');
+        const bgMusic = document.getElementById('bg-music');
+        const wishContainer = document.getElementById('wish-container');
+        const wishText = document.getElementById('wish-text');
+
+        // Hàm gọi API Flask Backend
+        async function fetchWishFromAPI() {
+            try {
+                // Gọi tới backend đã thiết lập CORS
+                const response = await fetch('http://localhost:5000/api/v1/wishes/random');
+                if (!response.ok) throw new Error('Network response was not ok');
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    displayWish(result.data.wish);
+                } else {
+                    throw new Error('API returned an error state');
+                }
+            } catch (error) {
+                console.error('Fetch API Error:', error);
+                // Dữ liệu hiển thị khẩn cấp khi Backend chưa khởi chạy hoặc lỗi mạng
+                const fallbackMsg = "Trăng đêm rằm tròn thật đấy, nhưng có em bên cạnh thì Trung thu của anh mới gọi là trọn vẹn. Chúc em yêu luôn bình an và mãi giữ nụ cười rạng rỡ ấy.";
+                displayWish(fallbackMsg);
+            }
+        }
+
+        function displayWish(text) {
+            wishText.innerHTML = text;
+            wishContainer.style.opacity = '1';
+        }
+
+        openBtn.addEventListener('click', () => {
+            // MỞ KHÓA AUDIO: Kích hoạt .play() ngay trong User Event Callback
+            let playPromise = bgMusic.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.log("Audio bị trình duyệt chặn, cần tương tác thêm:", error);
+                });
+            }
+            
+            // Hiệu ứng biến mất lớp phủ
+            overlay.style.opacity = '0';
+            setTimeout(() => { 
+                overlay.style.visibility = 'hidden'; 
+                // Bắt đầu tải lời chúc sau khi rèm mở ra
+                fetchWishFromAPI();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
